@@ -220,9 +220,42 @@ class PolicyIteration(MDPSolver):
         """
         policy = np.zeros([self.state_dim, self.action_dim])
         V = np.zeros([self.state_dim])
-        ### PUT YOUR CODE HERE ###
-        #raise NotImplementedError("Needed for Q1")
+        
+        while True:
+
+            policy_stable = True
+
+            # Improve the policy for each iteration
+            for state in range(0, self.state_dim):
+                old_action = np.argmax(policy[state,:]) # save the old optimal action to check convergence later
+
+                # Update the values for each action given the state
+                cur_vs = np.zeros(self.action_dim) # array to save the values for each action in
+                for action in range(0, self.action_dim):
+                    cur_vs[action] = np.sum([self.mdp.P[state, action, future_state]*(self.mdp.R[state, action, future_state] + self.gamma*V[future_state]) for future_state in range(0, self.state_dim)])
+
+                # Update deterministic policy
+                policy[state,:] = 0
+                policy[state,np.argmax(cur_vs)] = 1
+
+                # If the best action changed --> not stable
+                if old_action != np.argmax(policy[state,:]):
+                    policy_stable = False
+
+            # Policy is converged if actions did not change
+            if policy_stable:
+                break
+            
+            # If the policy is not stable --> make policy evaluation
+            else: 
+                V = self._policy_eval(policy)
+
         return policy, V
+
+        
+
+
+        
 
     def solve(self, theta: float = 1e-6) -> Tuple[np.ndarray, np.ndarray]:
         """Solves the MDP
