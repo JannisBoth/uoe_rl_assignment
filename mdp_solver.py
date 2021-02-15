@@ -124,10 +124,10 @@ class ValueIteration(MDPSolver):
         """
         policy = np.zeros([self.state_dim, self.action_dim])
 
-        # Get the deterministic policy for each state
+        # Get the deterministic policy for each state with matched action
         for state in range(0,self.state_dim):
 
-             # Calculate the value for each action in this state (Bellman)
+            # Calculate the value for each action in this state (Bellman)
             cur_vs = np.zeros(self.action_dim) # array to save the values for each action in
             for action in range(0, self.action_dim):
                 cur_vs[action] = np.sum([self.mdp.P[state, action, future_state]*(self.mdp.R[state, action, future_state] + self.gamma*V[future_state]) for future_state in range(0, self.state_dim)])
