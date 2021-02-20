@@ -55,10 +55,15 @@ class Agent(ABC):
             received observation representing the current environmental state
         :return (int): index of selected action
         """
-        ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q2")
-        ### RETURN AN ACTION HERE ###
-        return -1
+        
+        u = np.random.uniform(low = 0.0, high = 1.0, size = 1)
+
+        if u <= self.epsilon:
+            selected_action = np.random.randint(low = 0, high = self.n_acts - 1)
+
+        else:
+            selected_action = np.argmax([self.q_table[(obs, action)] for action in range(0,self.n_acts-1)])
+        return selected_action
 
     @abstractmethod
     def schedule_hyperparameters(self, timestep: int, max_timestep: int):
@@ -110,8 +115,12 @@ class QLearningAgent(Agent):
         :param done (bool): flag indicating whether a terminal state has been reached
         :return (float): updated Q-value for current observation-action pair
         """
-        ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q2")
+        if done == True:
+            self.q_table[(obs, action)] = 0
+        else:
+            max_next_value = np.max([self.q_table[(n_obs, action)] for action in range(0,self.n_acts-1)])
+            self.q_table[(obs, action)] = self.q_table[(obs, action)] + self.alpha*(reward + self.gamma*max_next_value - self.q_table[(obs, action)])
+
         return self.q_table[(obs, action)]
 
     def schedule_hyperparameters(self, timestep: int, max_timestep: int):
@@ -125,8 +134,11 @@ class QLearningAgent(Agent):
         :param timestep (int): current timestep at the beginning of the episode
         :param max_timestep (int): maximum timesteps that the training loop will run for
         """
-        ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q2")
+        max_alpha = 0.1
+        min_alpha = 0.0001
+        alpha_difference = max_alpha - min_alpha
+
+        self.alpha = max_alpha - timestep/max_timestep * alpha_difference
 
 
 class MonteCarloAgent(Agent):

@@ -79,8 +79,30 @@ class ValueIteration(MDPSolver):
             E.g. V[3] returns the computed value for state 3
         """
         V = np.zeros(self.state_dim)
-        ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q1")
+
+        
+        while True:
+            delta = 0
+
+            # Calculate the value for each state
+            for state in range(0, self.state_dim):
+                v = V[state] # save current value
+                
+                # Calculate the value for each action in this state (Bellman)
+                cur_vs = np.zeros(self.action_dim) # array to save the values for each action in
+                for action in range(0, self.action_dim):
+                    cur_vs[action] = np.sum([self.mdp.P[state, action, future_state]*(self.mdp.R[state, action, future_state] + self.gamma*V[future_state]) for future_state in range(0, self.state_dim)])
+                
+                # Assign the maximum value as the new state value
+                V[state] = max(cur_vs)
+
+                # Calculate stopping criterion
+                delta = max(delta, np.abs(v-V[state]))
+
+            # Break the loop if converged enough
+            if delta < theta: 
+                break
+
         return V
 
     def _calc_policy(self, V: np.ndarray) -> np.ndarray:
@@ -101,8 +123,16 @@ class ValueIteration(MDPSolver):
             policy[S, OTHER_ACTIONS] = 0
         """
         policy = np.zeros([self.state_dim, self.action_dim])
-        ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q1")
+
+        # Get the deterministic policy for each state with matched action
+        for state in range(0,self.state_dim):
+
+            # Calculate the value for each action in this state (Bellman)
+            cur_vs = np.zeros(self.action_dim) # array to save the values for each action in
+            for action in range(0, self.action_dim):
+                cur_vs[action] = np.sum([self.mdp.P[state, action, future_state]*(self.mdp.R[state, action, future_state] + self.gamma*V[future_state]) for future_state in range(0, self.state_dim)])
+
+            policy[state, np.argmax(cur_vs)] = 1 # Deterministic policy to the most valuable action # TODO: Break Ties
         return policy
 
     def solve(self, theta: float = 1e-6) -> Tuple[np.ndarray, np.ndarray]:
@@ -148,8 +178,26 @@ class PolicyIteration(MDPSolver):
             It is indexed as (State) where V[State] is the value of state 'State'
         """
         V = np.zeros(self.state_dim)
-        ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q1")
+        
+        while True:
+            delta = 0
+
+            # Change value for each state
+            for state in range(0, self.state_dim):
+                v = V[state] # save old state value
+
+                #TODO use all actions instead of argmax
+                action = np.argmax(policy[state,:]) # get action choosen by policy
+
+                # Assign new value based on the action choosen
+                V[state] = np.sum([self.mdp.P[state, action, future_state]*(self.mdp.R[state, action, future_state] + self.gamma*V[future_state]) for future_state in range(0, self.state_dim)])
+
+                delta = max(0, np.abs(V[state]-v)) # update stopping criterion
+
+            # Break the loop if converged enough
+            if delta < solver.theta:
+                break
+
         return np.array(V)
 
     def _policy_improvement(self) -> Tuple[np.ndarray, np.ndarray]:
@@ -173,9 +221,42 @@ class PolicyIteration(MDPSolver):
         """
         policy = np.zeros([self.state_dim, self.action_dim])
         V = np.zeros([self.state_dim])
-        ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q1")
+        
+        while True:
+
+            policy_stable = True
+
+            # Improve the policy for each iteration
+            for state in range(0, self.state_dim):
+                old_action = np.argmax(policy[state,:]) # save the old optimal action to check convergence later
+
+                # Update the values for each action given the state
+                cur_vs = np.zeros(self.action_dim) # array to save the values for each action in
+                for action in range(0, self.action_dim):
+                    cur_vs[action] = np.sum([self.mdp.P[state, action, future_state]*(self.mdp.R[state, action, future_state] + self.gamma*V[future_state]) for future_state in range(0, self.state_dim)])
+
+                # Update deterministic policy
+                policy[state,:] = 0
+                policy[state,np.argmax(cur_vs)] = 1
+
+                # If the best action changed --> not stable
+                if old_action != np.argmax(policy[state,:]):
+                    policy_stable = False
+
+            # Policy is converged if actions did not change
+            if policy_stable:
+                break
+            
+            # If the policy is not stable --> make policy evaluation
+            else: 
+                V = self._policy_eval(policy)
+
         return policy, V
+
+        
+
+
+        
 
     def solve(self, theta: float = 1e-6) -> Tuple[np.ndarray, np.ndarray]:
         """Solves the MDP
