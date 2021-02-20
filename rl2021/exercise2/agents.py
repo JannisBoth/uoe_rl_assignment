@@ -134,11 +134,18 @@ class QLearningAgent(Agent):
         :param timestep (int): current timestep at the beginning of the episode
         :param max_timestep (int): maximum timesteps that the training loop will run for
         """
-        max_alpha = 0.1
-        min_alpha = 0.0001
-        alpha_difference = max_alpha - min_alpha
 
-        self.alpha = max_alpha - timestep/max_timestep * alpha_difference
+        """
+        if timestep == 0:
+            self.max_alpha = self.alpha
+            self.min_alpha = 0.0001
+            self.alpha_difference = self.max_alpha - self.min_alpha
+
+        self.alpha = self.max_alpha - timestep/max_timestep * self.alpha_difference"""
+
+        max_deduct, decay = 0.95, 0.07
+        self.epsilon =  1.0 - (min(1.0, timestep/(decay * max_timestep))) * max_deduct
+
 
 
 class MonteCarloAgent(Agent):
@@ -174,8 +181,27 @@ class MonteCarloAgent(Agent):
             indexed by the state action pair.
         """
         updated_values = {}
-        ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q2")
+        returns = defaultdict(lambda: [])
+        obses = np.asarray(obses)
+        actions = np.asarray(actions)
+        
+        g = 0
+        for t in range(len(obses)-2, 0, -1):
+            g = self.gamma * g + rewards[t+1]
+
+            # Gets indices where current action and state appeared earlier
+            state_id = np.where(obses[0:t] == obses[t])[0]
+            act_id = np.where(actions[0:t] == actions[t])[0]
+
+            # if both indices are not empty and same indices are included in array
+            # Than pari s_t, a_t appears in earlier timestep
+            if state_id.size != 0 and act_id.size != 0 and np.any(state_id == act_id):
+                continue
+            else:
+                returns[(obses[t], actions[t])].append(g)
+                #print(returns[(obses[t], actions[t])])
+                updated_values = np.mean(returns[(obses[t], actions[t])])
+                
         return updated_values
 
     def schedule_hyperparameters(self, timestep: int, max_timestep: int):
@@ -190,4 +216,4 @@ class MonteCarloAgent(Agent):
         :param max_timestep (int): maximum timesteps that the training loop will run for
         """
         ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q2")
+        #raise NotImplementedError("Needed for Q2")
