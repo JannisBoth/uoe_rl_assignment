@@ -12,9 +12,9 @@ CONFIG = {
     "eps_max_steps": 100,
     "eval_episodes": 500,
     "eval_freq": 1000,
-    "gamma": 0.99,
+    "gamma": 0.95,
     "alpha": 0.5,
-    "epsilon": 0.0,
+    "epsilon": 0.05,
 }
 
 

@@ -8,14 +8,13 @@ REAL_MAX_EPISODE_STEPS = 100 # CUT OF AN EPISODE THAT RUNS LONGER THAN THAT. DO 
 ### TUNE HYPERPARAMETERS HERE ###
 CONFIG = {
     "env": "Taxi-v3",
-    "total_eps": 100000,
-    "eps_max_steps": 100,
+    "total_eps": 200000,
+    "eps_max_steps": 200,
     "eval_episodes": 500,
-    "eval_freq": 5000,
+    "eval_freq": 1000,
     "gamma": 0.99,
-    "epsilon": 0.0,
+    "epsilon": 0.01,
 }
-
 
 def monte_carlo_eval(
         env,

@@ -13,7 +13,6 @@ class Agent(ABC):
     **ONLY CHANGE THE BODY OF THE act() FUNCTION**
 
     """
-
     def __init__(
         self,
         action_space: Space,
@@ -49,23 +48,18 @@ class Agent(ABC):
     def act(self, obs: np.ndarray) -> int:
         """Implement the epsilon-greedy action selection here
 
-        **YOU MUST IMPLEMENT THIS FUNCTION FOR Q2**
-
         :param obs (np.ndarray of float with dim (observation size)):
             received observation representing the current environmental state
         :return (int): index of selected action
         """
-        
-        u = np.random.uniform(low = 0.0, high = 1.0, size = 1)
+        a_vals = [self.q_table[(obs, a)] for a in range(self.n_acts)]
+        max_val = max(a_vals)
+        max_acts = [idx for idx, a_val in enumerate(a_vals) if a_val == max_val]
 
-        if u <= self.epsilon:
-            selected_action = np.random.randint(low = 0, high = self.n_acts-1)
-
+        if random.random() < self.epsilon:
+            return random.randint(0, self.n_acts - 1)
         else:
-            selected_action = np.argmax([self.q_table[(obs, action)] for action in range(self.n_acts)])
-            if selected_action.size > 1:
-                selected_action = np.random.choice(selected_action)
-        return selected_action
+            return random.choice(max_acts)
 
     @abstractmethod
     def schedule_hyperparameters(self, timestep: int, max_timestep: int):
@@ -86,7 +80,6 @@ class Agent(ABC):
 
 class QLearningAgent(Agent):
     """Agent using the Q-Learning algorithm
-
     """
 
     def __init__(self, alpha: float, **kwargs):
@@ -106,8 +99,6 @@ class QLearningAgent(Agent):
     ) -> float:
         """Updates the Q-table based on agent experience
 
-        **YOU MUST IMPLEMENT THIS FUNCTION FOR Q2**
-
         :param obs (np.ndarray of float with dim (observation size)):
             received observation representing the current environmental state
         :param action (int): index of applied action
@@ -117,18 +108,15 @@ class QLearningAgent(Agent):
         :param done (bool): flag indicating whether a terminal state has been reached
         :return (float): updated Q-value for current observation-action pair
         """
-        # TODO: Change Done implementation
-        # TODO: Change Range for max_next-value
-        max_next_value = np.max([self.q_table[(n_obs, action)] for action in range(self.n_acts)])
-        target_value = reward + self.gamma*(1-done)*max_next_value 
-        self.q_table[(obs, action)] = self.q_table[(obs, action)] + self.alpha*(target_value - self.q_table[(obs, action)])
-
+        max_q_action = max([self.q_table[(n_obs, a)] for a in range(self.n_acts)])
+        target_value = reward + self.gamma * (1 - done) * max_q_action
+        self.q_table[(obs, action)] += self.alpha * (
+            target_value - self.q_table[(obs, action)]
+        )
         return self.q_table[(obs, action)]
 
     def schedule_hyperparameters(self, timestep: int, max_timestep: int):
         """Updates the hyperparameters
-
-        **YOU MUST IMPLEMENT THIS FUNCTION FOR Q2**
 
         This function is called before every episode and allows you to schedule your
         hyperparameters.
@@ -136,19 +124,7 @@ class QLearningAgent(Agent):
         :param timestep (int): current timestep at the beginning of the episode
         :param max_timestep (int): maximum timesteps that the training loop will run for
         """
-
-        """
-        if timestep == 0:
-            self.max_alpha = self.alpha
-            self.min_alpha = 0.0001
-            self.alpha_difference = self.max_alpha - self.min_alpha
-
-        self.alpha = self.max_alpha - timestep/max_timestep * self.alpha_difference"""
         self.epsilon = 1.0-(min(1.0, timestep/(0.07*max_timestep)))*0.95
-        #max_deduct, decay = 0.95, 0.07
-        #self.epsilon =  1.0 - (min(1.0, timestep/(decay * max_timestep))) * max_deduct
-
-
 
 class MonteCarloAgent(Agent):
     """Agent using the Monte-Carlo algorithm for training
@@ -171,8 +147,6 @@ class MonteCarloAgent(Agent):
     ) -> Dict:
         """Updates the Q-table based on agent experience
 
-        **YOU MUST IMPLEMENT THIS FUNCTION FOR Q2**
-
         :param obses (List(np.ndarray) with numpy arrays of float with dim (observation size)):
             list of received observations representing environmental states of trajectory (in
             the order they were encountered)
@@ -184,34 +158,27 @@ class MonteCarloAgent(Agent):
             indexed by the state action pair.
         """
         updated_values = {}
-        #returns = defaultdict(lambda: [])
-        obses = np.asarray(obses)
-        actions = np.asarray(actions)
         
-        g = 0
-        for t in range(len(obses)-2, 0, -1):
-            g = self.gamma * g + rewards[t+1]
-
-            # Gets indices where current action and state appeared earlier
-            state_id = np.where(obses[0:t] == obses[t])[0]
-            act_id = np.where(actions[0:t] == actions[t])[0]
-
-            # if both indices are not empty and same indices are included in array
-            # Than pari s_t, a_t appears in earlier timestep
-            if state_id.size != 0 and act_id.size != 0 and np.any(state_id == act_id):
-                continue
-            else:
-                self.returns[(obses[t], actions[t])].append(g)
-                #print(returns[(obses[t], actions[t])])
-                updated_values[(obses[t], actions[t])] = np.mean(self.returns[(obses[t], actions[t])])
+        # All state action pairs for a specific trajectory
+        sa_pairs = list(zip(obses, actions))
+        G = 0
+        # Iterate backwards through a trajectory
+        for t, (obs, a, r) in enumerate(zip(obses[::-1],actions[::-1],rewards[::-1])):
+            G = self.gamma * G + r
+            # Checking if state action pair has been seen before
+            if (obs, a) not in sa_pairs[:-(t+1)]:
+                self.returns[(obs, a)].append(G)
+                # First-visit counter
+                self.sa_counts[(obs, a)] = 1 if (obs, a) not in self.sa_counts.keys() else self.sa_counts[(obs, a)] + 1
+                # Online averaging of returns
+                updated_values[(obs, a)] = self.q_table[(obs, a)] + (G - self.q_table[(obs, a)]) / (self.sa_counts[(obs, a)])
+                #updated_values[(obs, a)] = np.mean(self.returns[(obs, a)])
         
         self.q_table.update(updated_values)
         return updated_values
 
     def schedule_hyperparameters(self, timestep: int, max_timestep: int):
         """Updates the hyperparameters
-
-        **YOU MUST IMPLEMENT THIS FUNCTION FOR Q2**
 
         This function is called before every episode and allows you to schedule your
         hyperparameters.
