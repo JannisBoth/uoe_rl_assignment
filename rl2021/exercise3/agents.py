@@ -6,6 +6,8 @@ import os.path
 from torch import Tensor
 from torch.distributions.categorical import Categorical
 import torch.nn
+import torch
+from numpy.random import choice
 from torch.optim import Adam
 from typing import Dict, Iterable, List
 
@@ -266,6 +268,8 @@ class Reinforce(Agent):
         # WRITE ANY AGENT PARAMETERS HERE #
         # ############################### #
 
+        self.action_probabilities = []
+
         # ###############################################
         self.saveables.update(
             {
@@ -285,7 +289,7 @@ class Reinforce(Agent):
         :param max_timestep (int): maximum timesteps that the training loop will run for
         """
         ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q3")
+        #raise NotImplementedError("Needed for Q3")
 
     def act(self, obs: np.ndarray, explore: bool):
         """Returns an action (should be called at every timestep)
@@ -299,8 +303,14 @@ class Reinforce(Agent):
         :param explore (bool): flag indicating whether we should explore
         :return (sample from self.action_space): action the agent should perform
         """
-        ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q3")
+        action_probs = self.policy.forward(torch.from_numpy(obs).float())
+        self.action_probabilities = action_probs.detach().numpy()
+
+        if explore == True:
+            action = choice(np.arange(0,len(self.action_probabilities)), p = self.action_probabilities)
+        else:
+            action = np.argmax(self.action_probabilities)
+        return action
 
     def update(
         self, rewards: List[float], observations: List[np.ndarray], actions: List[int],
@@ -315,7 +325,23 @@ class Reinforce(Agent):
         :return (Dict[str, float]): dictionary mapping from loss names to loss values
             losses
         """
-        ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q3")
+
+        self.policy.train()
         p_loss = 0.0
+        g = 0
+        T = len(actions)
+        for t, (r, obs, act) in enumerate(zip(rewards[::-1], observations[::-1], actions[::-1])):
+            g += self.gamma**t * r
+
+            action_probs = self.policy.forward(torch.from_numpy(obs).float())
+            p_loss += -torch.log(action_probs[act])*g
+
+        p_loss = p_loss / T
+
+        #print(p_loss)
+
+        self.policy_optim.zero_grad()
+        p_loss.backward()
+        self.policy_optim.step()
+
         return {"p_loss": p_loss}
