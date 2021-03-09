@@ -15,14 +15,14 @@ RENDER = False # FALSE FOR FASTER TRAINING / TRUE TO VISUALIZE ENVIRONMENT DURIN
 CARTPOLE_CONFIG = {
     "env": "CartPole-v1",
     "episode_length": 200,
-    "max_timesteps": 20000,
+    "max_timesteps": 40000,
     "max_time": 30 * 60,
     "eval_freq": 1000, # HOW OFTEN WE EVALUATE (AND RENDER IF RENDER=TRUE)
-    "eval_episodes": 5,
+    "eval_episodes": 10,
     "learning_rate": 1e-2,
     "hidden_size": (128,64),
-    "target_update_freq": 5000,
-    "batch_size": 10,
+    "target_update_freq": 500,
+    "batch_size": 20,
     "gamma": 0.99,
     "buffer_capacity": int(1e6),
     "plot_loss": False, # SET TRUE FOR 3.3 (Understanding the Loss)

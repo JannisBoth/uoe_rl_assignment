@@ -174,8 +174,7 @@ class DQN(Agent):
         :param timestep (int): current timestep at the beginning of the episode
         :param max_timestep (int): maximum timesteps that the training loop will run for
         """
-        ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q3")
+        self.epsilon = self.epsilon / 1.007
 
     def act(self, obs: np.ndarray, explore: bool):
         """Returns an action (should be called at every timestep)
@@ -190,8 +189,21 @@ class DQN(Agent):
         :param explore (bool): flag indicating whether we should explore
         :return (sample from self.action_space): action the agent should perform
         """
-        ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q3")
+
+        
+
+        if explore:
+            # use epsilon greedy
+            u = np.random.uniform(low = 0.0, high = 1.0, size = 1)
+
+            if u < self.epsilon:
+                # random action
+                return np.random.randint(low = 0, high = self.action_space.n)
+
+        # use greedy policy
+        action_probs = self.critics_target.forward(torch.from_numpy(obs).float()).detach().numpy()
+        return np.argmax(action_probs)
+
 
     def update(self, batch: Transition) -> Dict[str, float]:
         """Update function for DQN
@@ -205,9 +217,38 @@ class DQN(Agent):
         :param batch (Transition): batch vector from replay buffer
         :return (Dict[str, float]): dictionary mapping from loss names to loss values
         """
-        ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q3")
         q_loss = 0.0
+
+        states = getattr(batch, "states")
+        actions = getattr(batch, "actions")
+        rewards = getattr(batch, "rewards")
+        next_states = getattr(batch, "next_states")
+        done = getattr(batch, "done")
+
+        # select the maximum q-value from the target network for the current state
+        max_qs = torch.max(self.critics_target.forward(next_states), 1).values.unsqueeze(1)
+        # selecte the action value for the value netword in the current state
+        #act_conv = torch.tensor(actions, dtype = int)
+        target = self.critics_net.forward(states).gather(1,actions.long())
+        done_tens = 1-done
+        y_hat = rewards + self.gamma*(done_tens) * max_qs
+
+        L = torch.nn.MSELoss()(y_hat, target)    
+        # Calculate the loss based on the q-values
+        #L = ( - act_qs)**2
+
+        # Update the value network
+        self.critics_optim.zero_grad()
+        L.backward()
+        self.critics_optim.step()
+
+        self.update_counter += 1
+
+        if self.update_counter % self.target_update_freq:
+            # Hardupdate the target and set the parameters as the value network's parameters
+            self.critics_target.hard_update(source = self.critics_net)
+
+        
         return {"q_loss": q_loss}
 
 
