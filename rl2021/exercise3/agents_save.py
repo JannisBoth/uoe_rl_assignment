@@ -174,7 +174,8 @@ class DQN(Agent):
         :param timestep (int): current timestep at the beginning of the episode
         :param max_timestep (int): maximum timesteps that the training loop will run for
         """
-        self.epsilon = self.epsilon / 1.007
+        ### PUT YOUR CODE HERE ###
+        #raise NotImplementedError("Needed for Q3")
 
     def act(self, obs: np.ndarray, explore: bool):
         """Returns an action (should be called at every timestep)
@@ -225,28 +226,27 @@ class DQN(Agent):
         next_states = getattr(batch, "next_states")
         done = getattr(batch, "done")
 
-        # select the maximum q-value from the target network for the current state
-        max_qs = torch.max(self.critics_target.forward(next_states), 1).values.unsqueeze(1)
-        # selecte the action value for the value netword in the current state
-        #act_conv = torch.tensor(actions, dtype = int)
-        target = self.critics_net.forward(states).gather(1,actions.long())
-        done_tens = 1-done
-        y_hat = rewards + self.gamma*(done_tens) * max_qs
+        for s, a, r, ns, d in zip(states, actions, rewards, next_states, done):
 
-        L = torch.nn.MSELoss()(y_hat, target)    
-        # Calculate the loss based on the q-values
-        #L = ( - act_qs)**2
+            # select the maximum q-value from the target network for the current state
+            max_q = torch.max(self.critics_target.forward(ns))
+            # selecte the action value for the value netword in the current state
+            act_q = self.critics_net.forward(s)[a.numpy()]
+            
+            # Calculate the loss based on the q-values
+            L = (r + self.gamma*(1-d) * max_q - act_q)**2
+            q_loss += L.item()
 
-        # Update the value network
-        self.critics_optim.zero_grad()
-        L.backward()
-        self.critics_optim.step()
+            # Update the value network
+            self.critics_optim.zero_grad()
+            L.backward()
+            self.critics_optim.step()
 
-        self.update_counter += 1
+            self.update_counter += 1
 
-        if self.update_counter % self.target_update_freq:
-            # Hardupdate the target and set the parameters as the value network's parameters
-            self.critics_target.hard_update(source = self.critics_net)
+            if self.update_counter % self.target_update_freq:
+                # Hardupdate the target and set the parameters as the value network's parameters
+                self.critics_target.hard_update(source = self.critics_net)
 
         
         return {"q_loss": q_loss}
@@ -257,8 +257,13 @@ class Reinforce(Agent):
 
     ** YOU NEED TO IMPLEMENT THE FUNCTIONS IN THIS CLASS **
 
-    :attr policy (FCNetwork): fully connected network for policy
-    :attr policy_optim (torch.optim): PyTorch optimiser for policy network
+    :attr critics_net (FCNetwork): fully connected critic network to compute Q-value estimates
+    :attr critics_target (FCNetwork): fully connected target critic network
+    :attr critics_optim (torch.optim): PyTorch optimiser for critics network
+    :attr actors_net (FCNetwork): fully connected actor network for policy
+    :attr actors_optim (torch.optim): PyTorch optimiser for actor network
+    :attr learning_rate (float): learning rate for DQN optimisation
+    :attr gamma (float): discount rate gamma
     """
 
     def __init__(

@@ -6,10 +6,9 @@ import os.path
 from torch import Tensor
 from torch.distributions.categorical import Categorical
 import torch.nn
-import torch
-from numpy.random import choice
 from torch.optim import Adam
 from typing import Dict, Iterable, List
+
 
 from rl2021.exercise3.networks import FCNetwork
 from rl2021.exercise3.replay import Transition, ReplayBuffer
@@ -20,11 +19,6 @@ class Agent(ABC):
 
     **DO NOT CHANGE THIS CLASS**
 
-    :attr action_space (gym.Space): action space of used environment
-    :attr observation_space (gym.Space): observation space of used environment
-    :attr saveables (Dict[str, torch.nn.Module]):
-        mapping from network names to PyTorch network modules
-
     Note:
         see http://gym.openai.com/docs/#spaces for more information on Gym spaces
     """
@@ -34,20 +28,21 @@ class Agent(ABC):
 
         :param action_space (gym.Space): environment's action space
         :param observation_space (gym.Space): environment's observation space
+
+        :attr saveables (Dict[str, torch.nn.Module]):
+            mapping from network names to PyTorch network modules
         """
         self.action_space = action_space
         self.observation_space = observation_space
 
         self.saveables = {}
 
-    def save(self, path: str, suffix: str = "") -> str:
+    def save(self, path: str) -> str:
         """Saves saveable PyTorch models under given path
 
-        The models will be saved in directory found under given path in file "models_{suffix}.pt"
-        where suffix is given by the optional parameter (by default empty string "")
+        The models will be saved in directory found under given path in file "{path}"
 
         :param path (str): path to directory where to save models
-        :param suffix (str, optional): suffix given to models file
         :return (str): path to file of saved models file
         """
         torch.save(self.saveables, path)
@@ -66,11 +61,17 @@ class Agent(ABC):
 
     @abstractmethod
     def act(self, obs: np.ndarray):
+        """Returns an action to select in given observation
+
+        **DO NOT CHANGE THIS FUNCTION**
+        """
         ...
 
     @abstractmethod
     def schedule_hyperparameters(self, timestep: int, max_timestep: int):
         """Updates the hyperparameters
+
+        **DO NOT CHANGE THIS FUNCTION**
 
         This function is called before every episode and allows you to schedule your
         hyperparameters.
@@ -82,23 +83,17 @@ class Agent(ABC):
 
     @abstractmethod
     def update(self):
+        """Updates model parameters
+
+        **DO NOT CHANGE THIS FUNCTION**
+        """
         ...
 
 
 class DQN(Agent):
     """The DQN agent for exercise 3
 
-    **YOU NEED TO IMPLEMENT FUNCTIONS IN THIS CLASS**
-
-    :attr critics_net (FCNetwork): fully connected DQN to compute Q-value estimates
-    :attr critics_target (FCNetwork): fully connected DQN target network
-    :attr critics_optim (torch.optim): PyTorch optimiser for DQN critics_net
-    :attr learning_rate (float): learning rate for DQN optimisation
-    :attr update_counter (int): counter of updates for target network updates
-    :attr target_update_freq (int): update frequency (number of iterations after which the target
-        networks should be updated)
-    :attr batch_size (int): size of sampled batches of experience
-    :attr gamma (float): discount rate gamma
+    **YOU MUST COMPLETE THIS CLASS**
     """
 
     def __init__(
@@ -114,8 +109,6 @@ class DQN(Agent):
     ):
         """The constructor of the DQN agent class
 
-        **YOU MUST IMPLEMENT THIS FUNCTION FOR Q3**
-
         :param action_space (gym.Space): environment's action space
         :param observation_space (gym.Space): environment's observation space
         :param learning_rate (float): learning rate for DQN optimisation
@@ -124,6 +117,11 @@ class DQN(Agent):
             networks should be updated)
         :param batch_size (int): size of sampled batches of experience
         :param gamma (float): discount rate gamma
+
+        :attr critics_net (FCNetwork): fully connected DQN to compute Q-value estimates
+        :attr critics_target (FCNetwork): fully connected DQN target network
+        :attr critics_optim (torch.optim): PyTorch optimiser for DQN critics_net
+        :attr update_counter (int): counter of updates for target network updates
         """
         super().__init__(action_space, observation_space)
 
@@ -146,15 +144,13 @@ class DQN(Agent):
         # ############################################# #
         # WRITE ANY HYPERPARAMETERS YOU MIGHT NEED HERE #
         # ############################################# #
+        self.epsilon = 0.05
         self.learning_rate = learning_rate
         self.update_counter = 0
         self.target_update_freq = target_update_freq
         self.batch_size = batch_size
         self.gamma = gamma
-
-        self.epsilon = 1
         # ######################################### #
-
         self.saveables.update(
             {
                 "critics_net": self.critics_net,
@@ -174,7 +170,9 @@ class DQN(Agent):
         :param timestep (int): current timestep at the beginning of the episode
         :param max_timestep (int): maximum timesteps that the training loop will run for
         """
-        self.epsilon = self.epsilon / 1.007
+        max_deduct, decay = 0.95, 0.1
+        self.epsilon = 1.0 - (min(1.0,timestep/(decay*max_timestep)))*max_deduct
+        self.learning_rate = self.learning_rate - timestep/(decay*max_timestep)*max_deduct
 
     def act(self, obs: np.ndarray, explore: bool):
         """Returns an action (should be called at every timestep)
@@ -182,83 +180,78 @@ class DQN(Agent):
         **YOU MUST IMPLEMENT THIS FUNCTION FOR Q3**
 
         When explore is False you should select the best action possible (greedy). However, during
-        exploration, you should be implementing an exploration strategy (like e-greedy). Use
-        schedule_hyperparameters() for any hyperparameters that you want to change over time.
+        exploration, you should be implementing an exploration strategy
 
         :param obs (np.ndarray): observation vector from the environment
-        :param explore (bool): flag indicating whether we should explore
+        :param explore (bool): flag indicating whether we should explore (or act greedily)
         :return (sample from self.action_space): action the agent should perform
         """
+        state = torch.from_numpy(obs).float().unsqueeze(0)
+        action_values = self.critics_net(state)
+        action_values = action_values.detach().numpy()
+        opt_action = np.argmax(action_values)
 
-        
 
-        if explore:
-            # use epsilon greedy
-            u = np.random.uniform(low = 0.0, high = 1.0, size = 1)
+        if explore == True:
+            if np.random.rand() < self.epsilon:
+                action = np.random.choice(action_values.size)
+                return action
+            else:
+                return opt_action
+            
+        else:
+            return opt_action
 
-            if u < self.epsilon:
-                # random action
-                return np.random.randint(low = 0, high = self.action_space.n)
-
-        # use greedy policy
-        action_probs = self.critics_target.forward(torch.from_numpy(obs).float()).detach().numpy()
-        return np.argmax(action_probs)
 
 
     def update(self, batch: Transition) -> Dict[str, float]:
         """Update function for DQN
 
         **YOU MUST IMPLEMENT THIS FUNCTION FOR Q3**
-
+        
         This function is called after storing a transition in the replay buffer. This happens
         every timestep. It should update your network and return the Q-loss in the form of a
         dictionary.
 
         :param batch (Transition): batch vector from replay buffer
-        :return (Dict[str, float]): dictionary mapping from loss names to loss values
+        :return (Dict[str, float]): dictionary mapping from loss names to value of losses
         """
-        q_loss = 0.0
-
-        states = getattr(batch, "states")
-        actions = getattr(batch, "actions")
-        rewards = getattr(batch, "rewards")
-        next_states = getattr(batch, "next_states")
-        done = getattr(batch, "done")
-
-        # select the maximum q-value from the target network for the current state
-        max_qs = torch.max(self.critics_target.forward(next_states), 1).values.unsqueeze(1)
-        # selecte the action value for the value netword in the current state
-        #act_conv = torch.tensor(actions, dtype = int)
-        target = self.critics_net.forward(states).gather(1,actions.long())
-        done_tens = 1-done
-        y_hat = rewards + self.gamma*(done_tens) * max_qs
-
-        L = torch.nn.MSELoss()(y_hat, target)    
-        # Calculate the loss based on the q-values
-        #L = ( - act_qs)**2
-
-        # Update the value network
-        self.critics_optim.zero_grad()
-        L.backward()
-        self.critics_optim.step()
-
+        
         self.update_counter += 1
 
-        if self.update_counter % self.target_update_freq:
-            # Hardupdate the target and set the parameters as the value network's parameters
-            self.critics_target.hard_update(source = self.critics_net)
+        states = batch[0]
+        actions = batch[1]
+        next_states = batch[2]
+        rewards = batch[3]
+        dones = batch[4]
+
+        max_next_values = self.critics_target(next_states).max(1)[0].detach().unsqueeze(1)
+       
+        y = rewards + (1-dones) * self.gamma * max_next_values
+        Q = self.critics_net(states).gather(1,actions.long())
+
+        q_loss = torch.nn.MSELoss()(y, Q)
+
+        self.critics_optim.zero_grad()
+        q_loss.backward()
+        for param in self.critics_net.parameters():
+            param.grad.data.clamp_(-1,1)
+        self.critics_optim.step()
+
+        if self.update_counter % self.target_update_freq == 0:
+            self.critics_target.hard_update(self.critics_net)
 
         
+      
         return {"q_loss": q_loss}
+
+
 
 
 class Reinforce(Agent):
     """ The Reinforce Agent for Ex 3
 
-    ** YOU NEED TO IMPLEMENT THE FUNCTIONS IN THIS CLASS **
-
-    :attr policy (FCNetwork): fully connected network for policy
-    :attr policy_optim (torch.optim): PyTorch optimiser for policy network
+    **YOU MUST COMPLETE THIS CLASS**
     """
 
     def __init__(
@@ -271,47 +264,50 @@ class Reinforce(Agent):
         **kwargs,
     ):
         """
-        **YOU MUST IMPLEMENT THIS FUNCTION FOR Q3**
-
         :param action_space (gym.Space): environment's action space
         :param observation_space (gym.Space): environment's observation space
         :param learning_rate (float): learning rate for DQN optimisation
         :param hidden_size (Iterable[int]): list of hidden dimensionalities for fully connected DQNs
         :param gamma (float): discount rate gamma
+
+        :attr policy (FCNetwork): fully connected actor network for policy
+        :attr policy_optim (torch.optim): PyTorch optimiser for policy network
         """
         super().__init__(action_space, observation_space)
         STATE_SIZE = observation_space.shape[0]
         ACTION_SIZE = action_space.n
 
+
+
         # ######################################### #
         #  BUILD YOUR NETWORKS AND OPTIMIZERS HERE  #
         # ######################################### #
 
-        ### DO NOT CHANGE THE OUTPUT ACTIVATION OF THIS POLICY ###
+
+
         self.policy = FCNetwork(
-            (STATE_SIZE, *hidden_size, ACTION_SIZE), output_activation=torch.nn.modules.activation.Softmax
+            (STATE_SIZE, *hidden_size, ACTION_SIZE), output_activation=None
         )
 
         self.policy_optim = Adam(self.policy.parameters(), lr=learning_rate, eps=1e-3)
 
         # ############################################# #
-        # WRITE ANY EXTRA HYPERPARAMETERS YOU NEED HERE #
+        # WRITE ANY HYPERPARAMETERS YOU MIGHT NEED HERE #
         # ############################################# #
+        
         self.learning_rate = learning_rate
         self.gamma = gamma
+
+        
 
         # ############################### #
         # WRITE ANY AGENT PARAMETERS HERE #
         # ############################### #
-
-        self.action_probabilities = []
-
+         
+        self.save_policy_probs = []
+        
         # ###############################################
-        self.saveables.update(
-            {
-                "policy": self.policy,
-            }
-        )
+        self.saveables.update({"policy": self.policy})
 
     def schedule_hyperparameters(self, timestep: int, max_timesteps: int):
         """Updates the hyperparameters 
@@ -324,8 +320,11 @@ class Reinforce(Agent):
         :param timestep (int): current timestep at the beginning of the episode
         :param max_timestep (int): maximum timesteps that the training loop will run for
         """
-        ### PUT YOUR CODE HERE ###
-        #raise NotImplementedError("Needed for Q3")
+        
+        # max_deduct, decay = 0.95, 0.1
+        # self.gamma = 1.0 - (min(1.0, timestep/(decay * max_timesteps))) * max_deduct
+
+
 
     def act(self, obs: np.ndarray, explore: bool):
         """Returns an action (should be called at every timestep)
@@ -339,19 +338,22 @@ class Reinforce(Agent):
         :param explore (bool): flag indicating whether we should explore
         :return (sample from self.action_space): action the agent should perform
         """
-        action_probs = self.policy.forward(torch.from_numpy(obs).float())
-        self.action_probabilities = action_probs.detach().numpy()
+        state = torch.from_numpy(obs).float().unsqueeze(0)
+        probs = self.policy.forward(state)
+        probs = torch.nn.functional.softmax(probs)
 
-        if explore == True:
-            action = choice(np.arange(0,len(self.action_probabilities)), p = self.action_probabilities)
-        else:
-            action = np.argmax(self.action_probabilities)
-        return action
+        m = Categorical(probs)
+        action = m.sample()
+        self.save_policy_probs.append(m.log_prob(action))
+       
+        return action.item()
+
+
 
     def update(
-        self, rewards: List[float], observations: List[np.ndarray], actions: List[int],
-        ) -> Dict[str, float]:
-        """Update function for policy gradients
+        self, rewards: List[float], observations: List[np.ndarray], actions: List[int]
+    ) -> Dict[str, float]:
+        """Update function for REINFORCE
 
         **YOU MUST IMPLEMENT THIS FUNCTION FOR Q3**
 
@@ -359,25 +361,25 @@ class Reinforce(Agent):
         :param observations (List[np.ndarray]): observations of episode (from first to last)
         :param actions (List[int]): applied actions of episode (from first to last)
         :return (Dict[str, float]): dictionary mapping from loss names to loss values
-            losses
         """
-
         self.policy.train()
+        G = 0
         p_loss = 0.0
-        g = 0
-        T = len(actions)
-        for t, (r, obs, act) in enumerate(zip(rewards[::-1], observations[::-1], actions[::-1])):
-            g += self.gamma**t * r
+        t = len(self.save_policy_probs)-1
 
-            action_probs = self.policy.forward(torch.from_numpy(obs).float())
-            p_loss += -torch.log(action_probs[act])*g
+        for r in rewards[::-1]:
+            G = r + self.gamma * G
+            p_loss = p_loss - self.save_policy_probs[t] * G 
+            t = t - 1
 
-        p_loss = p_loss / T
+        p_loss = p_loss/len(rewards)
 
-        #print(p_loss)
-
+       
         self.policy_optim.zero_grad()
         p_loss.backward()
         self.policy_optim.step()
+        del self.save_policy_probs[:]
+        
 
+        # print(p_loss)
         return {"p_loss": p_loss}
