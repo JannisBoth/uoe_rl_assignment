@@ -8,12 +8,12 @@ from rl2021.exercise5.matrix_game import create_penalty_game, create_climbing_ga
 PEN_CONFIG = {
     "env": "penalty",
     "env_args": (-5, 1, False),
-    "total_eps": 5000,
+    "total_eps": 5_000,
     "eps_max_steps": 10,
     "eval_freq": 100,
     "gamma": 0.99,
     "lr": 0.05,
-    "epsilon": 0.9,
+    "epsilon": 0.7,
     "goal_payoff": 10,
 }
 

@@ -114,8 +114,24 @@ class IndependentQLearningAgents(MultiAgent):
         :return (List[int]): index of selected action for each agent
         """
         actions = []
-        ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q5")
+
+        rng = np.random.default_rng()
+
+        for i, obs in enumerate(obss):
+            # Make epsilon-greedy action selection for each agent where i is the index of the agent
+            u = np.random.uniform(low = 0.0, high = 1.0, size = 1)
+
+            if u <= self.epsilon:
+                selected_action = rng.choice(range(self.n_acts[i]))
+
+            else:
+                val_id = [self.q_tables[i][(obs, action)] for action in range(self.n_acts[i])]
+                selected_action = np.argmax(val_id)
+                # selected_action = np.argmax([self.q_tables[i][(obs, action)] for action in range(self.n_acts[i])])
+                # if selected_action.size > 1:
+                #     selected_action = np.random.choice(selected_action)
+            actions.append(selected_action)
+            
         return actions
 
 
@@ -136,8 +152,13 @@ class IndependentQLearningAgents(MultiAgent):
         :return (List[float]): updated Q-values for current observation-action pair of each agent
         """
         updated_values = []
-        ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q5")
+
+        for i, (obs, action, reward, n_obs, done) in enumerate(zip(obss, actions, rewards, n_obss, dones)):
+            max_next_value = np.max([self.q_tables[i][(n_obs, action)] for action in range(self.n_acts[i])])
+            target_value = reward + self.gamma*(1-done)*max_next_value 
+            self.q_tables[i][(obs, action)] = self.q_tables[i][(obs, action)] + self.learning_rate*(target_value - self.q_tables[i][(obs, action)])
+            updated_values.append(self.q_tables[i][(obs, action)])
+        
         return updated_values
 
 
@@ -153,7 +174,17 @@ class IndependentQLearningAgents(MultiAgent):
         :param max_timestep (int): maximum timesteps that the training loop will run for
         """
         ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q5")
+        if timestep == 0:
+            min_alpha = 1/1000
+            self.max_alpha = self.learning_rate
+            self.diff = (self.max_alpha - min_alpha)
+            
+        self.learning_rate = self.max_alpha - (self.diff) * (timestep / max_timestep)
+        
+        max_deduct, decay = 0.95, 0.07
+       
+        self.epsilon =  1.0 - (min(1.0, timestep/(decay * max_timestep))) * max_deduct
+        #raise NotImplementedError("Needed for Q5")
 
 
 class JointActionLearning(MultiAgent):
