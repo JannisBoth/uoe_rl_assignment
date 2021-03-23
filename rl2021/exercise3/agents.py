@@ -242,6 +242,8 @@ class DQN(Agent):
         L.backward()
         self.critics_optim.step()
 
+        q_loss = L # TODO Check if it works
+
         self.update_counter += 1
 
         if self.update_counter % self.target_update_freq:
@@ -325,7 +327,8 @@ class Reinforce(Agent):
         :param max_timestep (int): maximum timesteps that the training loop will run for
         """
         ### PUT YOUR CODE HERE ###
-        #raise NotImplementedError("Needed for Q3")
+        self.learning_rate = self.learning_rate / 1.007
+        self.gamma = min(0.999999999, self.gamma * 1.000000001)
 
     def act(self, obs: np.ndarray, explore: bool):
         """Returns an action (should be called at every timestep)
@@ -367,14 +370,12 @@ class Reinforce(Agent):
         g = 0
         T = len(actions)
         for t, (r, obs, act) in enumerate(zip(rewards[::-1], observations[::-1], actions[::-1])):
-            g += self.gamma**t * r
+            g = r + self.gamma*g
 
             action_probs = self.policy.forward(torch.from_numpy(obs).float())
             p_loss += -torch.log(action_probs[act])*g
 
         p_loss = p_loss / T
-
-        #print(p_loss)
 
         self.policy_optim.zero_grad()
         p_loss.backward()

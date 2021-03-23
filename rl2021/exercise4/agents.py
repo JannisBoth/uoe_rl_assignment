@@ -89,11 +89,13 @@ class DDPG(Agent):
         # ################################################### #
 
         ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q4")
+        self.noise = Normal(loc = torch.tensor([0.0]), scale = torch.tensor([0.1]))
 
         # ############################### #
         # WRITE ANY AGENT PARAMETERS HERE #
         # ############################### #
+
+        self.tanh2 = Tanh2()
 
         self.saveables.update(
             {
@@ -145,7 +147,7 @@ class DDPG(Agent):
         :param max_timestep (int): maximum timesteps that the training loop will run for
         """
         ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q4")
+        #raise NotImplementedError("Needed for Q4")
 
     def act(self, obs: np.ndarray, explore: bool):
         """Returns an action (should be called at every timestep)
@@ -161,7 +163,15 @@ class DDPG(Agent):
         :return (sample from self.action_space): action the agent should perform
         """
         ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q4")
+        action = self.actor_target.forward(torch.from_numpy(obs).float())
+
+        if explore:
+            action += self.noise.sample()
+
+        scaled_action = self.tanh2.forward(input = action).data
+        return scaled_action
+
+
 
     def update(self, batch: Transition) -> Dict[str, float]:
         """Update function for DQN
@@ -175,10 +185,42 @@ class DDPG(Agent):
         :param batch (Transition): batch vector from replay buffer
         :return (Dict[str, float]): dictionary mapping from loss names to loss values
         """
-        ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q4")
-        
         q_loss = 0.0
         p_loss = 0.0
+
+        states = getattr(batch, "states")
+        actions = getattr(batch, "actions")
+        rewards = getattr(batch, "rewards")
+        next_states = getattr(batch, "next_states")
+        done = getattr(batch, "done")
+        
+        # Update the Critic network
+        following_action = self.actor_target.forward(next_states).detach()
+        next_state_following_action_tensor = torch.cat((next_states ,following_action),1)
+        y_hat = rewards + self.gamma*(1-done)*self.critic_target(next_state_following_action_tensor)
+        
+        state_action_tensor =  torch.cat((states, actions),1)
+        target = self.critic(state_action_tensor)    
+        q_loss = torch.nn.MSELoss()(y_hat, target)
+        
+        self.critic_optim.zero_grad()
+        q_loss.backward()
+        self.critic_optim.step()
+
+        # Update the actor network
+        state_optimal_action_tensor = torch.cat((states,self.actor.forward(states)),1)
+        p_loss = torch.mean(-self.critic(state_optimal_action_tensor))
+
+        
+        self.policy_optim.zero_grad()
+        p_loss.backward()
+        self.policy_optim.step()
+
+        self.actor_target.soft_update(self.actor, self.tau)
+        self.critic_target.soft_update(self.critic, self.tau)
+
         return {"q_loss": q_loss,
                 "p_loss": p_loss}
+
+        
+
