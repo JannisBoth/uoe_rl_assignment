@@ -14,15 +14,15 @@ CARTPOLE_MAX_EPISODE_STEPS = 200 # USED FOR EVALUATION / DO NOT CHANGE
 ### TUNE HYPERPARAMETERS HERE ###
 CARTPOLE_CONFIG = {
     "env": "CartPole-v1",
-    "episode_length": 200,
-    "max_timesteps": 200000,
-    "eval_freq": 5000,
-    "eval_episodes": 5,
+    "episode_length": 500,
+    "max_timesteps": 200_000,
+    "eval_freq": 5_000,
+    "eval_episodes": 10,
     "max_time": 30 * 60,
     "gamma": 0.99,
-    "hidden_size": (16,16),
-    "learning_rate": 1e-2,
-    "save_filename": None,
+    "hidden_size": (128, ),
+    "learning_rate": 5e-4,
+    "save_filename": None
 }
 
 CONFIG = CARTPOLE_CONFIG
@@ -140,7 +140,7 @@ def train(env: gym.Env, config, output: bool = True) -> Tuple[List[float], List[
                     eval_return += total_reward / (config["eval_episodes"])
                 if output:
                     pbar.write(
-                        f"Evaluation at timestep {timesteps_elapsed} returned a mean return of {eval_return}"
+                        f"Evaluation at timestep {timesteps_elapsed} returned a mean return of {eval_return}, lr = {agent.learning_rate}"
                     )
                 eval_returns_all.append(eval_return)
                 eval_times_all.append(time.time() - start_time)
