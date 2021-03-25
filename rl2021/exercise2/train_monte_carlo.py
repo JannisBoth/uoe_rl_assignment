@@ -11,7 +11,7 @@ CONFIG = {
     "total_eps": 200_000,
     "eps_max_steps": 200,
     "eval_episodes": 500,
-    "eval_freq": 1000,
+    "eval_freq": 5000,
     "gamma": 0.99,
     "epsilon": 0.01,
 }
