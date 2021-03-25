@@ -327,7 +327,7 @@ class Reinforce(Agent):
         :param max_timestep (int): maximum timesteps that the training loop will run for
         """
         ### PUT YOUR CODE HERE ###
-        self.learning_rate = self.learning_rate / 1.007
+        self.learning_rate = self.learning_rate / 1.009
         self.gamma = min(0.999999999, self.gamma * 1.000000001)
 
     def act(self, obs: np.ndarray, explore: bool):
