@@ -62,6 +62,7 @@ class Agent(ABC):
             selected_action = np.random.randint(low = 0, high = self.n_acts-1)
 
         else:
+            # TODO: Change choice implementation
             selected_action = np.argmax([self.q_table[(obs, action)] for action in range(self.n_acts)])
             if selected_action.size > 1:
                 selected_action = np.random.choice(selected_action)
@@ -117,8 +118,7 @@ class QLearningAgent(Agent):
         :param done (bool): flag indicating whether a terminal state has been reached
         :return (float): updated Q-value for current observation-action pair
         """
-        # TODO: Change Done implementation
-        # TODO: Change Range for max_next-value
+
         max_next_value = np.max([self.q_table[(n_obs, action)] for action in range(self.n_acts)])
         target_value = reward + self.gamma*(1-done)*max_next_value 
         self.q_table[(obs, action)] = self.q_table[(obs, action)] + self.alpha*(target_value - self.q_table[(obs, action)])
@@ -144,9 +144,8 @@ class QLearningAgent(Agent):
             self.alpha_difference = self.max_alpha - self.min_alpha
 
         self.alpha = self.max_alpha - timestep/max_timestep * self.alpha_difference"""
-        self.epsilon = 1.0-(min(1.0, timestep/(0.07*max_timestep)))*0.95
-        #max_deduct, decay = 0.95, 0.07
-        #self.epsilon =  1.0 - (min(1.0, timestep/(decay * max_timestep))) * max_deduct
+
+        self.epsilon = self.epsilon / 1.00000001
 
 
 
@@ -164,7 +163,7 @@ class MonteCarloAgent(Agent):
         """
         super().__init__(**kwargs)
         self.sa_counts = {}
-        self.returns = defaultdict(lambda: [])
+        #self.returns = defaultdict(lambda: [])
 
     def learn(
         self, obses: List[np.ndarray], actions: List[int], rewards: List[float]
@@ -184,29 +183,34 @@ class MonteCarloAgent(Agent):
             indexed by the state action pair.
         """
         updated_values = {}
-        #returns = defaultdict(lambda: [])
-        obses = np.asarray(obses)
-        actions = np.asarray(actions)
+        state_action_pairs = list(zip(obses, actions))
         
         g = 0
-        for t in range(len(obses)-2, 0, -1):
-            g = self.gamma * g + rewards[t+1]
 
-            # Gets indices where current action and state appeared earlier
-            state_id = np.where(obses[0:t] == obses[t])[0]
-            act_id = np.where(actions[0:t] == actions[t])[0]
+        # Iterate in Reverse over the episode
+        for t in range(len(obses)-1, 0, -1):
 
-            # if both indices are not empty and same indices are included in array
-            # Than pari s_t, a_t appears in earlier timestep
-            if state_id.size != 0 and act_id.size != 0 and np.any(state_id == act_id):
+            cur_sa_pair = (obses[t], actions[t]) # Assign state action tuple because it is reused several times
+
+            # Update return 
+            g = self.gamma * g + rewards[t]
+
+            # Check if is not the first visit --> continue with the next observation
+            if cur_sa_pair in state_action_pairs[:t]:
                 continue
             else:
-                self.returns[(obses[t], actions[t])].append(g)
-                #print(returns[(obses[t], actions[t])])
-                updated_values[(obses[t], actions[t])] = np.mean(self.returns[(obses[t], actions[t])])
+                # Update state action count
+                if cur_sa_pair not in self.sa_counts:
+                    self.sa_counts[cur_sa_pair] = 1
+                else:
+                    self.sa_counts[cur_sa_pair] += 1
+
+                # Incrementally update the state action value estimate
+                updated_values[cur_sa_pair] = self.q_table[cur_sa_pair] + (g - self.q_table[cur_sa_pair]) / (self.sa_counts[cur_sa_pair])
         
         self.q_table.update(updated_values)
         return updated_values
+
 
     def schedule_hyperparameters(self, timestep: int, max_timestep: int):
         """Updates the hyperparameters
@@ -219,5 +223,6 @@ class MonteCarloAgent(Agent):
         :param timestep (int): current timestep at the beginning of the episode
         :param max_timestep (int): maximum timesteps that the training loop will run for
         """
-        #self.epsilon = 0.7 - (min(0.7, timestep / (0.2*max_timestep)))*0.95
-        self.epsilon = min(self.epsilon, 1 - min(1, timestep/(0.95*max_timestep)))
+        
+        self.epsilon = 0.7 - (min(0.7, timestep / (0.5*max_timestep)))*0.95
+        self.epsilon = min(self.epsilon, 1 - min(1, timestep/(0.75*max_timestep)))
