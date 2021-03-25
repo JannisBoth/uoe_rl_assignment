@@ -3,7 +3,7 @@ from collections import defaultdict
 import random
 import sys
 from typing import List, Dict, DefaultDict
-
+from copy import deepcopy
 import numpy as np
 from gym.spaces import Space, Box
 from gym.spaces.utils import flatdim
@@ -224,6 +224,30 @@ class JointActionLearning(MultiAgent):
         self.c_obss = [defaultdict(lambda: 0) for _ in range(self.num_agents)]
 
 
+    def calc_evs(self, agent_id, obss):
+        EV = [0] * self.n_acts[agent_id]
+        #possible_join_actions_other_agents = self.models[agent_id][obss[agent_id]].keys()
+
+        actions_other_agents = deepcopy(self.n_acts)
+        del actions_other_agents[agent_id]
+
+        possible_join_actions_other_agents = list(*[range(action) for action in actions_other_agents])
+
+        for act_idx, action in enumerate(range(self.n_acts[agent_id])):                    
+            
+            for pja in possible_join_actions_other_agents:
+                if type(pja) == int:
+                    pja = np.asarray([pja])
+                joint_actions = np.concatenate([pja[:agent_id], np.asarray([action]), pja[agent_id:]])
+                C = self.models[agent_id][obss[agent_id]][tuple(pja)]
+                N = self.c_obss[agent_id][obss[agent_id]]
+                Q = self.q_tables[agent_id][(obss[agent_id], tuple(joint_actions))]
+
+                EV[act_idx] += C/N*Q
+
+        return EV
+
+
     def act(self, obss: List[np.ndarray]) -> List[int]:
         """Implement the epsilon-greedy action selection here
 
@@ -234,9 +258,24 @@ class JointActionLearning(MultiAgent):
         :return (List[int]): index of selected action for each agent
         """
         joint_action = []
-        ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q5")
+
+        rng = np.random.default_rng()
+
+        for agent_id in range(self.num_agents):
+
+            u = np.random.uniform(low = 0.0, high = 1.0, size = 1)
+
+            if u <= self.epsilon:
+                joint_action.append(rng.choice(range(self.n_acts[agent_id])))
+
+            else:
+                action_q_values = [self.q_tables[agent_id][(obss[agent_id], act)] for act in range(self.n_acts[agent_id])]
+                
+                max_acts = np.argwhere(action_q_values == np.amax(action_q_values)).reshape(1,-1)[0]
+                joint_action.append(np.random.choice(max_acts))
+
         return joint_action
+
 
 
     def learn(
@@ -255,9 +294,19 @@ class JointActionLearning(MultiAgent):
         :param dones (List[bool]): flag indicating whether a terminal state has been reached for each agent
         :return (List[float]): updated Q-values for current observation-action pair of each agent
         """
-        updated_values = []
-        ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q5")
+        updated_values = [0]*self.num_agents
+        
+        for agent_id, (obs, reward, done) in enumerate(zip(obss, rewards, dones)):
+            joint_actions_other_agents = actions[:agent_id] + actions[agent_id+1 :]
+            self.c_obss[agent_id][obs] += 1
+            self.models[agent_id][obs][joint_actions_other_agents[0]] += 1
+
+            #max_ev = self.get_max_ev(agent_id, obs)
+            max_ev = max(self.calc_evs(agent_id, obss))
+            target_value = reward + self.gamma*(1-done)*max_ev
+            self.q_tables[agent_id][(obs, tuple(actions))] += self.learning_rate*(target_value - self.q_tables[agent_id][(obs, tuple(actions))])
+
+            updated_values[agent_id] = self.q_tables[agent_id][(obs, tuple(actions))]
         return updated_values
 
 
@@ -273,4 +322,4 @@ class JointActionLearning(MultiAgent):
         :param max_timestep (int): maximum timesteps that the training loop will run for
         """
         ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q5")
+        #raise NotImplementedError("Needed for Q5")
