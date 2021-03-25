@@ -137,15 +137,8 @@ class QLearningAgent(Agent):
         :param max_timestep (int): maximum timesteps that the training loop will run for
         """
 
-        """
-        if timestep == 0:
-            self.max_alpha = self.alpha
-            self.min_alpha = 0.0001
-            self.alpha_difference = self.max_alpha - self.min_alpha
-
-        self.alpha = self.max_alpha - timestep/max_timestep * self.alpha_difference"""
-
-        self.epsilon = self.epsilon / 1.00000001
+        self.epsilon = 0.7 - (min(0.7, timestep / (0.5*max_timestep)))*0.95
+        self.epsilon = min(self.epsilon, 1 - min(1, timestep/(0.75*max_timestep)))
 
 
 
@@ -163,7 +156,6 @@ class MonteCarloAgent(Agent):
         """
         super().__init__(**kwargs)
         self.sa_counts = {}
-        #self.returns = defaultdict(lambda: [])
 
     def learn(
         self, obses: List[np.ndarray], actions: List[int], rewards: List[float]
@@ -223,6 +215,6 @@ class MonteCarloAgent(Agent):
         :param timestep (int): current timestep at the beginning of the episode
         :param max_timestep (int): maximum timesteps that the training loop will run for
         """
-        
+
         self.epsilon = 0.7 - (min(0.7, timestep / (0.5*max_timestep)))*0.95
         self.epsilon = min(self.epsilon, 1 - min(1, timestep/(0.75*max_timestep)))
