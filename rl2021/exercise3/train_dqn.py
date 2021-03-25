@@ -15,23 +15,6 @@ CARTPOLE_MAX_EPISODE_STEPS = 200 # USED FOR EVALUATION / DO NOT CHANGE
 LUNARLANDER_MAX_EPISODE_STEPS = 500 # USED FOR EVALUATION / DO NOT CHANGE
 
 ### TUNE HYPERPARAMETERS HERE ###
-# CARTPOLE_CONFIG = {
-#     "env": "CartPole-v1",
-#     "episode_length": 200,
-#     "max_timesteps": 40000,
-#     "max_time": 30 * 60,
-#     "eval_freq": 1000, # HOW OFTEN WE EVALUATE (AND RENDER IF RENDER=TRUE)
-#     "eval_episodes": 10,
-#     "learning_rate": 1e-2,
-#     "hidden_size": (128,64),
-#     "target_update_freq": 500,
-#     "batch_size": 20,
-#     "gamma": 0.99,
-#     "buffer_capacity": int(1e6),
-#     "plot_loss": False, # SET TRUE FOR 3.3 (Understanding the Loss)
-#     "save_filename": None,
-# }
-
 CARTPOLE_CONFIG = {
     "env": "CartPole-v1",
     "use_lunar_scheduler": False,
@@ -52,24 +35,26 @@ CARTPOLE_CONFIG = {
 
 LUNARLANDER_CONFIG = {
     "env": "LunarLander-v2",
+    "use_lunar_scheduler": True,
     "episode_length": 500,
-    "max_timesteps": 300000,
+    "max_timesteps": 300_000,
     "max_time": 120 * 60,
-    "eval_freq": 5000,
-    "eval_episodes": 5,  # DECREASING THIS MIGHT REDUCE EVALUATION ACCURACY; BUT MAKES IT EASIER TO SEE HOW THE POLICY EVOLVES OVER TIME (BY ENABLING RENDER ABOVE)
-    "learning_rate": 1e-2,
-    "hidden_size": (128, 64),
-    "target_update_freq": 5000,
-    "batch_size": 10,
+    "eval_freq": 5_000,
+    "eval_episodes": 5,
+    "learning_rate": 5e-4,
+    "hidden_size": (128, 128),
+    "target_update_freq": 300,
+    "batch_size": 128,
     "gamma": 0.99,
-    "buffer_capacity": int(1e6),
+    "buffer_capacity": int(3e4),
     "plot_loss": False,
-    "save_filename": "dqn_lunarlander_latest.pt",
+    "save_filename": "dqn_lunarlander_latest.pt"
 }
 
 
+
 CONFIG = CARTPOLE_CONFIG
-# CONFIG = LUNARLANDER_CONFIG
+CONFIG = LUNARLANDER_CONFIG
 
 
 def play_episode(
